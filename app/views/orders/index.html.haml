@@ -1,3 +1,4 @@
+=  stripe_javascript_tag
 %div
   %h1 List of products
   = form_tag({:controller => "orders", :action => "submit" }, {:id => 'order-details'}) do
@@ -47,6 +48,54 @@
     $('#tab-' + newActiveTabID).addClass('active');
   }
 
+  (function setupStripe() {
+    //Initialize stripe with publishable key
+    var stripe = Stripe("#{ENV['STRIPE_PUBLISHABLE_KEY']}");
+
+    //Create Stripe credit card elements.
+    var elements = stripe.elements();
+    var card = elements.create('card');
+
+    //Add a listener in order to check if
+    card.addEventListener('change', function(event) {
+      //the div card-errors contains error details if any
+      var displayError = document.getElementById('card-errors');
+      document.getElementById('submit-stripe').disabled = false;
+      if (event.error) {
+        // Display error
+        displayError.textContent = event.error.message;
+      } else {
+        // Clear error
+        displayError.textContent = '';
+      }
+    });
+
+    // Mount Stripe card element in the #card-element div.
+    card.mount('#card-element');
+    var form = document.getElementById('order-details');
+    // This will be called when the #submit-stripe button is clicked by the user.
+    form.addEventListener('submit', function(event) {
+      $('#submit-stripe').prop('disabled', true);
+      event.preventDefault();
+      stripe.createToken(card).then(function(result) {
+        if (result.error) {
+          // Inform that there was an error.
+          var errorElement = document.getElementById('card-errors');
+          errorElement.textContent = result.error.message;
+        } else {
+          // Submits the order
+          var $form = $("#order-details");
+          // Add a hidden input orders[token]
+          $form.append($('<input type="hidden" name="orders[token]"/>').val(result.token.id));
+          // Set order type
+          $('#order-type').val('stripe');
+          $form.submit();
+        }
+      });
+      return false;
+    });
+  }());
+
 :css
   #card-element {
     width:500px;
@@ -57,4 +106,3 @@
   .paymentSelectionTab.active {
     display: block !important;
   }
-  
